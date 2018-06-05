@@ -21,33 +21,42 @@ import org.apache.kafka.common.header.Headers;
 import org.apache.kafka.common.header.internals.RecordHeaders;
 
 /**
+ * 发送给 Kafka 的 key/value ， 包含 topic 名字，可选的 partition 序号，可选的 key value
+ * <p>
  * A key/value pair to be sent to Kafka. This consists of a topic name to which the record is being sent, an optional
  * partition number, and an optional key and value.
  * <p>
+ * 当一个合法的 partition 序号被指定时，该 partition 序号就会在发送时被使用。如果没有 partition 序号被指定，但是 key 存在时，partition
+ * 序号会通过 key 的 hash 值来选择。如果 partition 序号和 key 都没有指定时，partition 序号会通过 round-robin fashion（轮询调度算法） 来生成。
  * If a valid partition number is specified that partition will be used when sending the record. If no partition is
  * specified but a key is present a partition will be chosen using a hash of the key. If neither key nor partition is
  * present a partition will be assigned in a round-robin fashion.
  * <p>
+ * record 也会有一个关联的时间戳。如果用户没有提供时间戳，生产者会以当前的时间填充。 时间戳最终会被 Kafka 以 topic TimestampType的配置来使用
  * The record also has an associated timestamp. If the user did not provide a timestamp, the producer will stamp the
  * record with its current time. The timestamp eventually used by Kafka depends on the timestamp type configured for
  * the topic.
  * <li>
+ * 如果 topic 配置 {@link org.apache.kafka.common.record.TimestampType#CREATE_TIME CreateTime} 那么生产者的时间戳会被 broker 使用
  * If the topic is configured to use {@link org.apache.kafka.common.record.TimestampType#CREATE_TIME CreateTime},
  * the timestamp in the producer record will be used by the broker.
  * </li>
  * <li>
+ * 如果 topic 配置 {@link org.apache.kafka.common.record.TimestampType#LOG_APPEND_TIME LogAppendTime} 那么当消息附加到 log 时，生产者的时间戳
+ * 会被 broker 本地的时间所覆盖。
  * If the topic is configured to use {@link org.apache.kafka.common.record.TimestampType#LOG_APPEND_TIME LogAppendTime},
  * the timestamp in the producer record will be overwritten by the broker with the broker local time when it appends the
  * message to its log.
  * </li>
  * <p>
+ * 无论是上面哪一种方法，最终实际本使用的时间戳会通过 {@link RecordMetadata} 返回给用户
  * In either of the cases above, the timestamp that has actually been used will be returned to user in
  * {@link RecordMetadata}
  */
 public class ProducerRecord<K, V> {
 
-    private final String topic;
-    private final Integer partition;
+    private final String topic;         // topic 名字
+    private final Integer partition;    // 分区号
     private final Headers headers;
     private final K key;
     private final V value;

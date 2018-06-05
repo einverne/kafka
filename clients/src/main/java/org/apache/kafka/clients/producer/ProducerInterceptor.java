@@ -19,6 +19,7 @@ package org.apache.kafka.clients.producer;
 import org.apache.kafka.common.Configurable;
 
 /**
+ * record 在从 producer 发送，到被发布到 Kafka cluster 集群，实现该接口（插件）可以让用户过滤（甚至改变）record
  * A plugin interface that allows you to intercept (and possibly mutate) the records received by the producer before
  * they are published to the Kafka cluster.
  * <p>
@@ -36,10 +37,12 @@ import org.apache.kafka.common.Configurable;
  */
 public interface ProducerInterceptor<K, V> extends Configurable {
     /**
+     * 在 key 和 value 序列化 和 partition 分配之前调用
      * This is called from {@link org.apache.kafka.clients.producer.KafkaProducer#send(ProducerRecord)} and
      * {@link org.apache.kafka.clients.producer.KafkaProducer#send(ProducerRecord, Callback)} methods, before key and value
      * get serialized and partition is assigned (if partition is not specified in ProducerRecord).
      * <p>
+     * 该方法允许修改 record，也就是说，新的 record 会返回。
      * This method is allowed to modify the record, in which case, the new record will be returned. The implication of modifying
      * key/value is that partition assignment (if not specified in ProducerRecord) will be done based on modified key/value,
      * not key/value from the client. Consequently, key and value transformation done in onSend() needs to be consistent:
@@ -70,6 +73,7 @@ public interface ProducerInterceptor<K, V> extends Configurable {
      * This method is called when the record sent to the server has been acknowledged, or when sending the record fails before
      * it gets sent to the server.
      * <p>
+     * 这个方法通常在用户 callback 调用之前被调用，或者是当 <code>KafkaProducer.send()</code> 抛出异常时调用 <p>
      * This method is generally called just before the user callback is called, and in additional cases when <code>KafkaProducer.send()</code>
      * throws an exception.
      * <p>

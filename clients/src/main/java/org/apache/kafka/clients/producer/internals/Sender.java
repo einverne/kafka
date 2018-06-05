@@ -68,6 +68,7 @@ import java.util.Map;
 import static org.apache.kafka.common.record.RecordBatch.NO_TIMESTAMP;
 
 /**
+ * 后台线程，用来处理将生产者请求发送到集群。
  * The background thread that handles the sending of produce requests to the Kafka cluster. This thread makes metadata
  * requests to renew its view of the cluster and then sends produce requests to the appropriate nodes.
  */
@@ -152,6 +153,8 @@ public class Sender implements Runnable {
     }
 
     /**
+     * record 写入成功后，如果 `RecordBatch` 满足发送条件，唤醒 sender 线程，发送 RecordBatch
+     *
      * The main run loop for the sender thread
      */
     public void run() {

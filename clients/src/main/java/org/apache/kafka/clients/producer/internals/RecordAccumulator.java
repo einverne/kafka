@@ -59,9 +59,11 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
+ * 该类表现为一个队列，用来累计 record 到 {@link MemoryRecords} 实例，然后发送到服务器
  * This class acts as a queue that accumulates records into {@link MemoryRecords}
  * instances to be sent to the server.
  * <p>
+ * 该累加器使用有限内存，当内存耗尽时附加请求会 block 阻塞，除非这个行为被显式禁用。
  * The accumulator uses a bounded amount of memory and append calls will block when that memory is exhausted, unless
  * this behavior is explicitly disabled.
  */
@@ -72,7 +74,7 @@ public final class RecordAccumulator {
     private final AtomicInteger flushesInProgress;
     private final AtomicInteger appendsInProgress;
     private final int batchSize;
-    private final CompressionType compression;
+    private final CompressionType compression;                      // 压缩方式
     private final long lingerMs;
     private final long retryBackoffMs;
     private final BufferPool free;
@@ -165,6 +167,7 @@ public final class RecordAccumulator {
     }
 
     /**
+     * 给缓冲队列添加内容，并返回结果
      * Add a record to the accumulator, return the append result
      * <p>
      * The append result will contain the future metadata, and flag for whether the appended batch is full or a new batch is created
@@ -193,7 +196,7 @@ public final class RecordAccumulator {
         try {
             // check if we have an in-progress batch
             Deque<ProducerBatch> dq = getOrCreateDeque(tp);
-            synchronized (dq) {
+            synchronized (dq) { // 队列进行操作时加锁，同步，保证线程安全
                 if (closed)
                     throw new IllegalStateException("Cannot send after the producer is closed.");
                 RecordAppendResult appendResult = tryAppend(timestamp, key, value, headers, callback, dq);
@@ -203,6 +206,7 @@ public final class RecordAccumulator {
 
             // we don't have an in-progress record batch try to allocate a new batch
             byte maxUsableMagic = apiVersions.maxUsableProduceMagic();
+            // 为 topic partition 创建新的 RecordBatch， 初始化内存大小根据 batchSize 或者 AbstractRecords.estimateSizeInBytesUpperBound 最大值
             int size = Math.max(this.batchSize, AbstractRecords.estimateSizeInBytesUpperBound(maxUsableMagic, compression, key, value, headers));
             log.trace("Allocating a new {} byte message buffer for topic {} partition {}", size, tp.topic(), tp.partition());
             buffer = free.allocate(size, maxTimeToBlock);
@@ -217,21 +221,25 @@ public final class RecordAccumulator {
                     return appendResult;
                 }
 
+                // 创建一个 RecordBatch
                 MemoryRecordsBuilder recordsBuilder = recordsBuilder(buffer, maxUsableMagic);
                 ProducerBatch batch = new ProducerBatch(tp, recordsBuilder, time.milliseconds());
+
+                // 向新 RecordBatch 中追加数据
                 FutureRecordMetadata future = Utils.notNull(batch.tryAppend(timestamp, key, value, headers, callback, time.milliseconds()));
 
-                dq.addLast(batch);
-                incomplete.add(batch);
+                dq.addLast(batch);      // 将 RecordBatch 添加到 队列
+                incomplete.add(batch);  // 向未 ACK 的 batch 中添加
 
                 // Don't deallocate this buffer in the finally block as it's being used in the record batch
                 buffer = null;
 
+                // 如果 dq.size > 1 证明 queue 有 Batch 可以发送
                 return new RecordAppendResult(future, dq.size() > 1 || batch.isFull(), true);
             }
         } finally {
             if (buffer != null)
-                free.deallocate(buffer);
+                free.deallocate(buffer); // 释放
             appendsInProgress.decrementAndGet();
         }
     }

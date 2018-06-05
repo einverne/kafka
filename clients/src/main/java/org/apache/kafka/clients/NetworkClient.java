@@ -211,6 +211,7 @@ public class NetworkClient implements KafkaClient {
     }
 
     /**
+     * 开始连接给定的节点，如果已经连接则返回 true。
      * Begin connecting to the given node, return true if we are already connected and ready to send to that node.
      *
      * @param node The node to check
@@ -454,6 +455,7 @@ public class NetworkClient implements KafkaClient {
     }
 
     /**
+     * 事实上的读写
      * Do actual reads and writes to sockets.
      *
      * @param timeout The maximum amount of time to wait (in ms) for responses if there are none immediately,

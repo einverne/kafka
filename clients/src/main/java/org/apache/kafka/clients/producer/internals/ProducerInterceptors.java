@@ -72,6 +72,7 @@ public class ProducerInterceptors<K, V> implements Closeable {
     }
 
     /**
+     * 当 record 发送到服务器被确认，该方法会被调用，或者当 record 在发送到服务器之前失败也会被调用
      * This method is called when the record sent to the server has been acknowledged, or when sending the record fails before
      * it gets sent to the server. This method calls {@link ProducerInterceptor#onAcknowledgement(RecordMetadata, Exception)}
      * method for each interceptor.

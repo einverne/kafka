@@ -30,6 +30,8 @@ import org.apache.kafka.common.utils.Utils;
 
 /**
  * The default partitioning strategy:
+ * 默认的分区策略：
+ *
  * <ul>
  * <li>If a partition is specified in the record, use it
  * <li>If no partition is specified but a key is present choose a partition based on a hash of the key
@@ -42,6 +44,7 @@ public class DefaultPartitioner implements Partitioner {
     public void configure(Map<String, ?> configs) {}
 
     /**
+     * 通过给定的 record 来确定分区序号
      * Compute the partition for the given record.
      *
      * @param topic The topic name
@@ -55,13 +58,16 @@ public class DefaultPartitioner implements Partitioner {
         List<PartitionInfo> partitions = cluster.partitionsForTopic(topic);
         int numPartitions = partitions.size();
         if (keyBytes == null) {
+            // 如果 key hash 为空
             int nextValue = nextValue(topic);
             List<PartitionInfo> availablePartitions = cluster.availablePartitionsForTopic(topic);
+            // leader 不为空
             if (availablePartitions.size() > 0) {
                 int part = Utils.toPositive(nextValue) % availablePartitions.size();
                 return availablePartitions.get(part).partition();
             } else {
                 // no partitions are available, give a non-available partition
+                // 无可用 partition
                 return Utils.toPositive(nextValue) % numPartitions;
             }
         } else {
@@ -70,16 +76,23 @@ public class DefaultPartitioner implements Partitioner {
         }
     }
 
+    /**
+     * 保存一个当前 topic 名字的数字
+     *
+     * @param topic topic
+     * @return random next int
+     */
     private int nextValue(String topic) {
         AtomicInteger counter = topicCounterMap.get(topic);
         if (null == counter) {
+            // 第一次随机产生
             counter = new AtomicInteger(ThreadLocalRandom.current().nextInt());
             AtomicInteger currentCounter = topicCounterMap.putIfAbsent(topic, counter);
             if (currentCounter != null) {
                 counter = currentCounter;
             }
         }
-        return counter.getAndIncrement();
+        return counter.getAndIncrement(); // 第一次随机数基础上自增
     }
 
     public void close() {}

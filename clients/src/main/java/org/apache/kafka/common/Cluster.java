@@ -30,6 +30,12 @@ import java.util.Set;
 
 /**
  * A representation of a subset of the nodes, topics, and partitions in the Kafka cluster.
+ * Kafka 集群节点部分信息，包括 leader 所在节点，replica 所在节点，isr 列表
+ *
+ * Cluster 实例保存：
+ * 1. broker id 与 node 对应关系
+ * 2. topic 和 PartitionInfo 对应关系
+ * 3. node 和 PartitionInfo 对应关系
  */
 public final class Cluster {
 
@@ -40,7 +46,7 @@ public final class Cluster {
     private final Node controller;
     private final Map<TopicPartition, PartitionInfo> partitionsByTopicPartition;
     private final Map<String, List<PartitionInfo>> partitionsByTopic;
-    private final Map<String, List<PartitionInfo>> availablePartitionsByTopic;
+    private final Map<String, List<PartitionInfo>> availablePartitionsByTopic; // 可用
     private final Map<Integer, List<PartitionInfo>> partitionsByNode;
     private final Map<Integer, Node> nodesById;
     private final ClusterResource clusterResource;
@@ -205,6 +211,7 @@ public final class Cluster {
     }
 
     /**
+     * 获取 Topic 的 partition 信息
      * Get the list of partitions for this topic
      * @param topic The topic name
      * @return A list of partitions
@@ -225,7 +232,9 @@ public final class Cluster {
     }
 
     /**
+     * 获取 topic 可以使用的 partition 列表
      * Get the list of available partitions for this topic
+     *
      * @param topic The topic name
      * @return A list of partitions
      */

@@ -37,12 +37,17 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
+ * 关于 metadata 相关逻辑的封装
  * A class encapsulating some of the logic around metadata.
  * <p>
+ * 这个类被 client （用来 partition） 和后台 sender 线程共享
  * This class is shared by the client thread (for partitioning) and the background sender thread.
  *
+ * Metadata 值保存了 topic 部分数据，当我们请求一个它上面没有的 topic meta 时,它会通过发送 metadata update 来更新 meta 信息
  * Metadata is maintained for only a subset of topics, which can be added to over time. When we request metadata for a
  * topic we don't have any metadata for it will trigger a metadata update.
+ * <p>
+ * 如果 topic meta 过期策略是允许的,那么任何 topic 过期的话都会被从集合中移除，但是 consumer 是不允许 topic 过期的因为它明确地知道它需要管理哪些 topic
  * <p>
  * If topic expiry is enabled for the metadata, any topic that has not been used within the expiry interval
  * is removed from the metadata refresh set after an update. Consumers disable topic expiry since they explicitly
@@ -55,16 +60,16 @@ public final class Metadata {
     public static final long TOPIC_EXPIRY_MS = 5 * 60 * 1000;
     private static final long TOPIC_EXPIRY_NEEDS_UPDATE = -1L;
 
-    private final long refreshBackoffMs;
-    private final long metadataExpireMs;
-    private int version;
-    private long lastRefreshMs;
-    private long lastSuccessfulRefreshMs;
+    private final long refreshBackoffMs;        // metadata 更新失败时,为避免频繁更新 meta,最小的间隔时间,默认 100ms
+    private final long metadataExpireMs;        // metadata 的过期时间, 默认 60,000ms
+    private int version;                        // 每更新成功1次，version自增1,主要是用于判断 metadata 是否更新
+    private long lastRefreshMs;                 // 最近一次更新时的时间（包含更新失败的情况）
+    private long lastSuccessfulRefreshMs;       // 最近一次成功更新的时间（如果每次都成功的话，与前面的值相等, 否则，lastSuccessulRefreshMs < lastRefreshMs)
     private AuthenticationException authenticationException;
     private Cluster cluster;
-    private boolean needUpdate;
+    private boolean needUpdate;                 // 是否需要更新
     /* Topics with expiry time */
-    private final Map<String, Long> topics;
+    private final Map<String, Long> topics;     // topic 与其过期时间的对应关系
     private final List<Listener> listeners;
     private final ClusterResourceListeners clusterResourceListeners;
     private boolean needMetadataForAllTopics;
@@ -112,6 +117,7 @@ public final class Metadata {
     /**
      * Add the topic to maintain in the metadata. If topic expiry is enabled, expiry time
      * will be reset on the next update.
+     * 在 metadata 中添加 topic 后,如果 metadata 中没有这个 topic 的 meta，那么 metadata 的更新标志设置为了 true
      */
     public synchronized void add(String topic) {
         Objects.requireNonNull(topic, "topic cannot be null");
@@ -174,7 +180,7 @@ public final class Metadata {
             if (ex != null)
                 throw ex;
             if (remainingWaitMs != 0)
-                wait(remainingWaitMs);
+                wait(remainingWaitMs); // 阻塞线程，等待 metadata 的更新
             long elapsed = System.currentTimeMillis() - begin;
             if (elapsed >= maxWaitMs)
                 throw new TimeoutException("Failed to update metadata after " + maxWaitMs + " ms.");
